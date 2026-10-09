@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Kelola Cuti & Backup Admin Toko</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-500 p-2 rounded-xl text-white shadow-lg shadow-brand-500/30">
+                    <i class="fa-solid font-bold fa-user-clock text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight">Admin Shift & Backup Master</h1>
+                    <p class="text-xs text-slate-400">3 Toko • 7 Admin • Shift 13.00 - 13.00 WIB</p>
+                </div>
+            </div>
+
+            <!-- Sync Indicator & Quick Actions -->
+            <div class="flex items-center space-x-3">
+                <div id="syncStatusBadge" class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="syncStatusText">Lokal (Belum Sinkron Sheets)</span>
+                </div>
+                
+                <button onclick="openSheetsModal()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shadow-sm">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Koneksi Google Sheets</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        
+        <!-- Navigation Tabs -->
+        <div class="flex flex-wrap border-b border-slate-200 bg-white p-1.5 rounded-2xl shadow-sm gap-1">
+            <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn active-tab flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 transition">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span>Dashboard Shift Hari Ini</span>
+            </button>
+            <button onclick="switchTab('cuti')" id="tab-btn-cuti" class="tab-btn flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 transition">
+                <i class="fa-solid fa-calendar-minus"></i>
+                <span>Pengajuan Cuti</span>
+            </button>
+            <button onclick="switchTab('schedule')" id="tab-btn-schedule" class="tab-btn flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 transition">
+                <i class="fa-solid fa-calendar-days"></i>
+                <span>Jadwal Rolling Bulanan</span>
+            </button>
+            <button onclick="switchTab('members')" id="tab-btn-members" class="tab-btn flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 transition">
+                <i class="fa-solid fa-users-gear"></i>
+                <span>Daftar Admin (7 Personil)</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: DASHBOARD -->
+        <section id="tab-dashboard" class="tab-content space-y-6">
+            <!-- Shift Time Banner -->
+            <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-brand-700 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <div class="flex items-center space-x-2 text-brand-100 text-xs font-semibold tracking-wider uppercase">
+                        <span class="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping"></span>
+                        <span>Shift Operasional Aktif</span>
+                    </div>
+                    <h2 class="text-2xl font-bold" id="currentShiftLabel">Pukul 13.00 WIB s/d 13.00 WIB (Besok)</h2>
+                    <p class="text-sm text-slate-300" id="currentDateLabel">Tanggal Shift: Loading...</p>
+                </div>
+                
+                <!-- Floating Backup Highlight Card -->
+                <div class="bg-white/10 backdrop-blur-md border border-white/15 p-4 rounded-xl flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-amber-500/20 text-amber-300 rounded-xl flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-amber-200 font-semibold uppercase">Backup Standby Hari Ini (Toko C)</div>
+                        <div class="text-lg font-bold text-white" id="todayBackupAdmin">Loading...</div>
+                        <div class="text-xs text-slate-300">Siap cover Toko A, B & C jika ada cuti</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Store Cards Matrix -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Toko A Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4 hover:shadow-md transition">
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">A</span>
+                            <div>
+                                <h3 class="font-bold text-slate-800">Toko A</h3>
+                                <p class="text-xs text-slate-500">Kuota: 2 Admin Utama</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Normal</span>
+                    </div>
+
+                    <div class="space-y-2.5" id="tokoA-admins">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Toko B Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4 hover:shadow-md transition">
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">B</span>
+                            <div>
+                                <h3 class="font-bold text-slate-800">Toko B</h3>
+                                <p class="text-xs text-slate-500">Kuota: 2 Admin Utama</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Normal</span>
+                    </div>
+
+                    <div class="space-y-2.5" id="tokoB-admins">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Toko C Card (3 Admins + Rolling Backup) -->
+                <div class="bg-white rounded-2xl shadow-sm border border-brand-200/80 p-5 space-y-4 hover:shadow-md transition relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-0.5 rounded-bl-lg uppercase tracking-wider">
+                        Rolling Base
+                    </div>
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm">C</span>
+                            <div>
+                                <h3 class="font-bold text-slate-800">Toko C</h3>
+                                <p class="text-xs text-slate-500">3 Admin (2 Utama + 1 Backup)</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Siklus 3 Hari</span>
+                    </div>
+
+                    <div class="space-y-2.5" id="tokoC-admins">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: PENGAJUAN CUTI -->
+        <section id="tab-cuti" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Cuti Form -->
+                <div class="md:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <h2 class="text-lg font-bold text-slate-800">Form Pengajuan Cuti</h2>
+                    <p class="text-xs text-slate-500">Pilih cuti 1 shift penuh atau izin hitungan jam tertentu.</p>
+
+                    <form id="cutiForm" onsubmit="handleCutiSubmit(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Pilih Admin</label>
+                            <select id="cutiAdminSelect" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                <!-- Dynamic -->
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Cuti Shift</label>
+                            <input type="date" id="cutiDate" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Tipe Durasi Cuti</label>
+                            <select id="cutiType" onchange="toggleCutiTypeInputs()" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                <option value="full">1 Shift Penuh (24 Jam: 13.00 - 13.00)</option>
+                                <option value="hourly">Izin Hitungan Jam (Jam Tertentu)</option>
+                            </select>
+                        </div>
+
+                        <!-- Hourly Time Inputs (Hidden by default) -->
+                        <div id="hourlyTimeInputs" class="hidden grid grid-cols-2 gap-2 bg-brand-50/50 p-3 rounded-xl border border-brand-100">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Jam Mulai</label>
+                                <input type="time" id="cutiStartTime" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Jam Selesai</label>
+                                <input type="time" id="cutiEndTime" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Keterangan / Alasan</label>
+                            <textarea id="cutiReason" rows="2" placeholder="Contoh: Izin Ke Dokter / Acara Keluarga" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none"></textarea>
+                        </div>
+
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm shadow-sm transition">
+                            Ajukan & Auto-Plot Backup
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Cuti Log & Approved List -->
+                <div class="md:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800">Daftar Pengajuan Cuti & Plot Replacement</h2>
+                        <span id="totalCutiBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold">0 Cuti Terjadwal</span>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-100 text-slate-700 uppercase text-[11px] font-bold">
+                                <tr>
+                                    <th class="p-3">Tanggal Shift</th>
+                                    <th class="p-3">Admin Cuti</th>
+                                    <th class="p-3">Durasi / Jam</th>
+                                    <th class="p-3">Toko Asal</th>
+                                    <th class="p-3">Digantikan Oleh</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cutiTableBody" class="divide-y divide-slate-100">
+                                <!-- Dynamic items -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: JADWAL ROLLING BULANAN -->
+        <section id="tab-schedule" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Jadwal Shift & Rotasi Rolling Toko C</h2>
+                        <p class="text-sm text-slate-500">Menampilkan kalkulasi otomatis rotasi 3 hari Toko C & penggantian cuti</p>
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                        <input type="month" id="scheduleMonthPicker" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-500">
+                        <button onclick="renderMonthlySchedule()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg shadow-sm">Filter</button>
+                    </div>
+                </div>
+
+                <!-- Schedule Table -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar max-h-[600px]">
+                    <table class="w-full text-left text-sm text-slate-700 relative">
+                        <thead class="bg-slate-900 text-slate-200 uppercase text-[11px] font-bold sticky top-0 z-10">
+                            <tr>
+                                <th class="p-3">Tanggal Shift (13.00-13.00)</th>
+                                <th class="p-3">Toko A (2 Admin)</th>
+                                <th class="p-3">Toko B (2 Admin)</th>
+                                <th class="p-3">Toko C (2 Admin Utama)</th>
+                                <th class="p-3 bg-amber-900/60 text-amber-200">Floating Backup (Toko C)</th>
+                                <th class="p-3">Status Cuti</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleTableBody" class="divide-y divide-slate-100 font-medium">
+                            <!-- Populated JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: DAFTAR ADMIN -->
+        <section id="tab-members" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Kelola Daftar Admin Toko</h2>
+                        <p class="text-sm text-slate-500">Isi data admin & toko di sini, atau tarik langsung dari Google Sheets Anda.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="fetchFromGoogleSheets()" class="px-3.5 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded-lg text-sm transition flex items-center space-x-2">
+                            <i class="fa-solid fa-cloud-arrow-down"></i>
+                            <span>Tarik dari Sheets</span>
+                        </button>
+                        <button onclick="addNewMember()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg text-sm transition flex items-center space-x-2">
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span>+ Tambah Admin</span>
+                        </button>
+                        <button onclick="saveAdminMembers()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg text-sm shadow-sm flex items-center space-x-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>Simpan & Sync</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="memberCardsContainer">
+                    <!-- Cards rendered dynamically -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL: GOOGLE SHEETS SETUP -->
+    <div id="sheetsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-slate-900 text-white p-5 flex justify-between items-center">
+                <div class="flex items-center space-x-2.5">
+                    <i class="fa-solid fa-file-csv text-emerald-400 text-xl"></i>
+                    <h3 class="font-bold text-lg">Hubungkan ke Google Sheets</h3>
+                </div>
+                <button onclick="closeSheetsModal()" class="text-slate-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1 text-sm text-slate-600">
+                <div class="space-y-2">
+                    <label class="block font-bold text-slate-800">1. URL Web App Google Apps Script</label>
+                    <input type="url" id="sheetWebAppUrl" placeholder="https://script.google.com/macros/s/AKfycbx.../exec" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    <p class="text-xs text-slate-400">Masukkan URL Web App hasil deploy Apps Script Google Sheets Anda.</p>
+                </div>
+
+                <div class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider">2. Script Google Apps Script (Copy-Paste ke Google Sheet)</h4>
+                        <button onclick="copyAppsScriptCode()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-semibold flex items-center space-x-1">
+                            <i class="fa-solid fa-copy"></i>
+                            <span>Salin Kode Script</span>
+                        </button>
+                    </div>
+
+                    <pre class="bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs font-mono overflow-x-auto h-44 custom-scrollbar" id="appsScriptCodeBlock">
+// === KODE GOOGLE APPS SCRIPT (SUPPORTS BACA & TULIS DATA) ===
+function doGet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var members = [];
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][1]) {
+      members.push({
+        id: String(data[i][0] || ("ADM" + i)),
+        name: String(data[i][1]),
+        store: String(data[i][2] || "Toko A"),
+        phone: String(data[i][3] || "")
+      });
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", members: members }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var body = JSON.parse(e.postData.contents);
+  if (body.action === "updateMembers") {
+    sheet.clear();
+    sheet.appendRow(["ID", "Nama Admin", "Toko", "No WA"]);
+    body.members.forEach(function(m) {
+      sheet.appendRow([m.id, m.name, m.store, m.phone || ""]);
+    });
+  }
+  return ContentService.createTextOutput(JSON.stringify({status: "success"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+                    </pre>
+                </div>
+            </div>
+
+            <div class="bg-slate-100 px-6 py-4 flex justify-end space-x-3 border-t border-slate-200">
+                <button onclick="closeSheetsModal()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-800 rounded-lg text-sm font-semibold">Tutup</button>
+                <button onclick="saveSheetsConnection()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold shadow-sm">Simpan & Test Sync</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script>
+        // Data diawali kosong atau diambil dari LocalStorage / Google Sheets
+        const DEFAULT_MEMBERS = [];
+
+        let members = JSON.parse(localStorage.getItem('shift_members')) || DEFAULT_MEMBERS;
+        let cutiRecords = JSON.parse(localStorage.getItem('shift_cuti')) || [];
+        let googleWebAppUrl = localStorage.getItem('shift_sheet_url') || "";
+
+        // --- INIT ON LOAD ---
+        window.onload = function() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            document.getElementById('scheduleMonthPicker').value = `${yyyy}-${mm}`;
+            document.getElementById('cutiDate').value = today.toISOString().split('T')[0];
+
+            if (googleWebAppUrl) {
+                document.getElementById('sheetWebAppUrl').value = googleWebAppUrl;
+                updateSyncStatus(true, "Koneksi Google Sheets Aktif");
+                // Tarik data dari Google Sheets jika ada koneksi
+                fetchFromGoogleSheets(true);
+            }
+
+            renderDashboard();
+            renderCutiTab();
+            renderMonthlySchedule();
+            renderMembersTab();
+        };
+
+        function getTokoCRotationForDate(dateObj) {
+            const anchorDate = new Date(2026, 0, 1);
+            const targetDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+            const diffDays = Math.floor((targetDate - anchorDate) / (1000 * 60 * 60 * 24));
+            
+            let mod = diffDays % 3;
+            if (mod < 0) mod += 3;
+
+            const cAdmins = members.filter(m => m.store === 'Toko C');
+            const c1 = cAdmins[0] || { id: 'C1', name: '(Admin C1 Belum Diisi)' };
+            const c2 = cAdmins[1] || { id: 'C2', name: '(Admin C2 Belum Diisi)' };
+            const c3 = cAdmins[2] || { id: 'C3', name: '(Admin C3 Belum Diisi)' };
+
+            if (mod === 0) {
+                return { primary: [c1, c2], backup: c3 };
+            } else if (mod === 1) {
+                return { primary: [c2, c3], backup: c1 };
+            } else {
+                return { primary: [c3, c1], backup: c2 };
+            }
+        }
+
+        function renderDashboard() {
+            const now = new Date();
+            let shiftDate = new Date(now);
+            if (now.getHours() < 13) {
+                shiftDate.setDate(shiftDate.getDate() - 1);
+            }
+
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDateLabel').innerText = `Tanggal Shift: ${shiftDate.toLocaleDateString('id-ID', options)}`;
+
+            const tokoCRotation = getTokoCRotationForDate(shiftDate);
+            document.getElementById('todayBackupAdmin').innerText = tokoCRotation.backup.name;
+
+            const dateStr = shiftDate.toISOString().split('T')[0];
+            const todayCutiList = cutiRecords.filter(c => c.date === dateStr);
+
+            const getCutiLabel = (admId) => {
+                const cuti = todayCutiList.find(c => c.adminId === admId);
+                if (!cuti) return null;
+                if (cuti.type === 'hourly') {
+                    return `Cuti Jam (${cuti.startTime}-${cuti.endTime})`;
+                }
+                return `Cuti Full Shift`;
+            };
+
+            // Render Toko A
+            const tokoAAdmins = members.filter(m => m.store === 'Toko A');
+            const tokoAContainer = document.getElementById('tokoA-admins');
+            if (tokoAAdmins.length === 0) {
+                tokoAContainer.innerHTML = `<p class="text-xs text-slate-400 italic p-2">Belum ada admin di Toko A. Tambahkan di tab 'Daftar Admin'.</p>`;
+            } else {
+                tokoAContainer.innerHTML = tokoAAdmins.map(adm => {
+                    let statusBadge = '<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-semibold">Utama</span>';
+                    let cardStyle = "bg-slate-50 border-slate-200";
+
+                    const cutiTxt = getCutiLabel(adm.id);
+                    if (cutiTxt) {
+                        statusBadge = `<span class="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs font-bold">${cutiTxt} (Cover: ${tokoCRotation.backup.name})</span>`;
+                        cardStyle = "bg-rose-50 border-rose-200";
+                    }
+
+                    return `
+                        <div class="p-3 rounded-xl border ${cardStyle} flex items-center justify-between">
+                            <div class="flex items-center space-x-2.5">
+                                <i class="fa-solid fa-user text-slate-400"></i>
+                                <span class="font-semibold text-sm">${adm.name || 'N/A'}</span>
+                            </div>
+                            ${statusBadge}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Render Toko B
+            const tokoBAdmins = members.filter(m => m.store === 'Toko B');
+            const tokoBContainer = document.getElementById('tokoB-admins');
+            if (tokoBAdmins.length === 0) {
+                tokoBContainer.innerHTML = `<p class="text-xs text-slate-400 italic p-2">Belum ada admin di Toko B. Tambahkan di tab 'Daftar Admin'.</p>`;
+            } else {
+                tokoBContainer.innerHTML = tokoBAdmins.map(adm => {
+                    let statusBadge = '<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-semibold">Utama</span>';
+                    let cardStyle = "bg-slate-50 border-slate-200";
+
+                    const cutiTxt = getCutiLabel(adm.id);
+                    if (cutiTxt) {
+                        statusBadge = `<span class="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs font-bold">${cutiTxt} (Cover: ${tokoCRotation.backup.name})</span>`;
+                        cardStyle = "bg-rose-50 border-rose-200";
+                    }
+
+                    return `
+                        <div class="p-3 rounded-xl border ${cardStyle} flex items-center justify-between">
+                            <div class="flex items-center space-x-2.5">
+                                <i class="fa-solid fa-user text-slate-400"></i>
+                                <span class="font-semibold text-sm">${adm.name || 'N/A'}</span>
+                            </div>
+                            ${statusBadge}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Render Toko C
+            const tokoCAdmins = members.filter(m => m.store === 'Toko C');
+            const tokoCContainer = document.getElementById('tokoC-admins');
+            if (tokoCAdmins.length === 0) {
+                tokoCContainer.innerHTML = `<p class="text-xs text-slate-400 italic p-2">Belum ada admin di Toko C. Tambahkan di tab 'Daftar Admin'.</p>`;
+            } else {
+                tokoCContainer.innerHTML = tokoCAdmins.map(adm => {
+                    const isBackup = (adm.name === tokoCRotation.backup.name || adm.id === tokoCRotation.backup.id);
+                    let roleLabel = isBackup 
+                        ? '<span class="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold rounded text-xs flex items-center space-x-1"><i class="fa-solid fa-shield"></i><span>Floating Backup</span></span>' 
+                        : '<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-semibold">Utama</span>';
+                    
+                    let cardStyle = isBackup ? "bg-amber-50/70 border-amber-200" : "bg-slate-50 border-slate-200";
+
+                    const cutiTxt = getCutiLabel(adm.id);
+                    if (cutiTxt) {
+                        roleLabel = `<span class="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs font-bold">${cutiTxt}</span>`;
+                        cardStyle = "bg-rose-50 border-rose-200";
+                    }
+
+                    return `
+                        <div class="p-3 rounded-xl border ${cardStyle} flex items-center justify-between">
+                            <div class="flex items-center space-x-2.5">
+                                <i class="fa-solid fa-user ${isBackup ? 'text-amber-600' : 'text-slate-400'}"></i>
+                                <span class="font-semibold text-sm ${isBackup ? 'text-amber-950 font-bold' : ''}">${adm.name || 'N/A'}</span>
+                            </div>
+                            ${roleLabel}
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        function toggleCutiTypeInputs() {
+            const type = document.getElementById('cutiType').value;
+            const container = document.getElementById('hourlyTimeInputs');
+            if (type === 'hourly') {
+                container.classList.remove('hidden');
+                document.getElementById('cutiStartTime').required = true;
+                document.getElementById('cutiEndTime').required = true;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('cutiStartTime').required = false;
+                document.getElementById('cutiEndTime').required = false;
+            }
+        }
+
+        function renderCutiTab() {
+            const select = document.getElementById('cutiAdminSelect');
+            if (members.length === 0) {
+                select.innerHTML = `<option value="">-- Belum ada admin (Isi di tab Admin) --</option>`;
+            } else {
+                select.innerHTML = members.map(m => `<option value="${m.id}">${m.name || '(Tanpa Nama)'} (${m.store})</option>`).join('');
+            }
+
+            const tbody = document.getElementById('cutiTableBody');
+            document.getElementById('totalCutiBadge').innerText = `${cutiRecords.length} Cuti Terjadwal`;
+
+            if (cutiRecords.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400 text-xs">Belum ada data pengajuan cuti.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = cutiRecords.map((c, idx) => {
+                const admin = members.find(m => m.id === c.adminId);
+                const dObj = new Date(c.date);
+                const rotation = getTokoCRotationForDate(dObj);
+
+                const durationText = c.type === 'hourly' 
+                    ? `<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-semibold rounded text-xs"><i class="fa-regular fa-clock mr-1"></i>${c.startTime} - ${c.endTime} WIB</span>`
+                    : `<span class="px-2 py-0.5 bg-slate-100 text-slate-700 font-semibold rounded text-xs">1 Shift (24 Jam)</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 font-semibold">${c.date}</td>
+                        <td class="p-3 font-bold text-slate-800">${admin ? (admin.name || 'N/A') : '-'}</td>
+                        <td class="p-3">${durationText}</td>
+                        <td class="p-3">${admin ? admin.store : '-'}</td>
+                        <td class="p-3 text-emerald-700 font-semibold">${rotation.backup.name}</td>
+                        <td class="p-3"><span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-xs font-bold">Disetujui</span></td>
+                        <td class="p-3 text-right">
+                            <button onclick="cancelCuti(${idx})" class="text-rose-600 hover:text-rose-800 text-xs font-semibold">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function handleCutiSubmit(e) {
+            e.preventDefault();
+            const adminId = document.getElementById('cutiAdminSelect').value;
+            if (!adminId) {
+                showToast("Pilih admin terlebih dahulu!", "error");
+                return;
+            }
+
+            const dateStr = document.getElementById('cutiDate').value;
+            const cutiType = document.getElementById('cutiType').value;
+            const startTime = document.getElementById('cutiStartTime').value;
+            const endTime = document.getElementById('cutiEndTime').value;
+            const reason = document.getElementById('cutiReason').value;
+
+            const existingFull = cutiRecords.find(c => c.date === dateStr && c.type === 'full');
+            if (existingFull && cutiType === 'full') {
+                showToast(`Gagal: Sudah ada admin yang cuti 1 shift penuh di tanggal tersebut!`, "error");
+                return;
+            }
+
+            cutiRecords.push({
+                adminId: adminId,
+                date: dateStr,
+                type: cutiType,
+                startTime: cutiType === 'hourly' ? startTime : '13:00',
+                endTime: cutiType === 'hourly' ? endTime : '13:00',
+                reason: reason,
+                created: new Date().toISOString()
+            });
+
+            cutiRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            localStorage.setItem('shift_cuti', JSON.stringify(cutiRecords));
+            showToast("Pengajuan Cuti berhasil disimpan & Backup diplot!", "success");
+
+            document.getElementById('cutiReason').value = "";
+            renderCutiTab();
+            renderDashboard();
+            renderMonthlySchedule();
+        }
+
+        function cancelCuti(index) {
+            cutiRecords.splice(index, 1);
+            localStorage.setItem('shift_cuti', JSON.stringify(cutiRecords));
+            showToast("Data cuti dihapus.", "info");
+            renderCutiTab();
+            renderDashboard();
+            renderMonthlySchedule();
+        }
+
+        function renderMonthlySchedule() {
+            const yearMonth = document.getElementById('scheduleMonthPicker').value;
+            if (!yearMonth) return;
+
+            const [year, month] = yearMonth.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            const tbody = document.getElementById('scheduleTableBody');
+            let rowsHtml = "";
+
+            const tokoA = members.filter(m => m.store === 'Toko A');
+            const tokoB = members.filter(m => m.store === 'Toko B');
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateObj = new Date(year, month - 1, day);
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                const rotation = getTokoCRotationForDate(dateObj);
+                const cutiOnDay = cutiRecords.find(c => c.date === dateStr);
+
+                let cutiBadge = '<span class="text-slate-400 text-xs">Nihil</span>';
+                let tokoAStr = tokoA.map(m => m.name || 'N/A').join(', ') || '-';
+                let tokoBStr = tokoB.map(m => m.name || 'N/A').join(', ') || '-';
+                let tokoCPrimaryStr = rotation.primary.map(m => m.name || 'N/A').join(', ');
+                let backupStr = rotation.backup.name;
+
+                if (cutiOnDay) {
+                    const cutiAdmin = members.find(m => m.id === cutiOnDay.adminId);
+                    const admName = cutiAdmin ? cutiAdmin.name : 'Admin';
+                    cutiBadge = `<span class="px-2 py-0.5 bg-rose-100 text-rose-700 font-bold rounded text-xs">${admName} (Cuti)</span>`;
+
+                    if (cutiAdmin && cutiAdmin.store === 'Toko A') {
+                        tokoAStr = tokoAStr.replace(admName, `<span class="line-through text-slate-400">${admName}</span> <span class="text-emerald-600 font-bold">(${backupStr})</span>`);
+                    } else if (cutiAdmin && cutiAdmin.store === 'Toko B') {
+                        tokoBStr = tokoBStr.replace(admName, `<span class="line-through text-slate-400">${admName}</span> <span class="text-emerald-600 font-bold">(${backupStr})</span>`);
+                    } else if (cutiAdmin && cutiAdmin.store === 'Toko C') {
+                        tokoCPrimaryStr = `3 Admin Toko C Aktif`;
+                    }
+                }
+
+                const dateDisplay = dateObj.toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' });
+
+                rowsHtml += `
+                    <tr class="hover:bg-slate-50 ${day % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}">
+                        <td class="p-3 font-semibold text-slate-900">${dateDisplay}</td>
+                        <td class="p-3 text-xs">${tokoAStr}</td>
+                        <td class="p-3 text-xs">${tokoBStr}</td>
+                        <td class="p-3 text-xs">${tokoCPrimaryStr}</td>
+                        <td class="p-3 text-xs font-bold bg-amber-50/80 text-amber-900">${backupStr}</td>
+                        <td class="p-3">${cutiBadge}</td>
+                    </tr>
+                `;
+            }
+
+            tbody.innerHTML = rowsHtml;
+        }
+
+        function renderMembersTab() {
+            const container = document.getElementById('memberCardsContainer');
+
+            if (members.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-3 bg-slate-50">
+                        <i class="fa-solid fa-users text-4xl text-slate-300"></i>
+                        <h3 class="font-bold text-slate-700 text-base">Belum Ada Data Admin</h3>
+                        <p class="text-xs text-slate-500 max-w-md mx-auto">Silakan klik tombol "+ Tambah Admin" untuk menambah anggota manual, atau klik "Tarik dari Sheets" jika sudah punya data di Google Sheets.</p>
+                        <div class="flex justify-center gap-3 pt-2">
+                            <button onclick="addNewMember()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold">+ Tambah Admin Baru</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = members.map((m, idx) => `
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 relative group">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 bg-slate-200 text-slate-700 font-bold rounded text-xs">ID: ${m.id}</span>
+                        </div>
+                        <button onclick="deleteMember(${idx})" class="text-rose-500 hover:text-rose-700 text-xs font-semibold px-2 py-1 rounded hover:bg-rose-50 transition" title="Hapus Admin">
+                            <i class="fa-solid fa-trash mr-1"></i>Hapus
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">Nama Admin</label>
+                        <input type="text" placeholder="Masukkan Nama Admin..." value="${m.name || ''}" onchange="updateMemberData(${idx}, 'name', this.value)" class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">Penempatan Toko</label>
+                        <select onchange="updateMemberData(${idx}, 'store', this.value)" class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm font-semibold outline-none">
+                            <option value="Toko A" ${m.store === 'Toko A' ? 'selected' : ''}>Toko A</option>
+                            <option value="Toko B" ${m.store === 'Toko B' ? 'selected' : ''}>Toko B</option>
+                            <option value="Toko C" ${m.store === 'Toko C' ? 'selected' : ''}>Toko C (3 Admin Rolling)</option>
+                        </select>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addNewMember() {
+            const nextId = "ADM" + (members.length + 1);
+            members.push({
+                id: nextId,
+                name: "",
+                store: members.filter(m => m.store === 'Toko C').length < 3 ? 'Toko C' : 'Toko A',
+                phone: ""
+            });
+            renderMembersTab();
+            renderDashboard();
+            renderCutiTab();
+        }
+
+        function deleteMember(index) {
+            members.splice(index, 1);
+            saveAdminMembers(false);
+            renderMembersTab();
+            renderDashboard();
+            renderCutiTab();
+            renderMonthlySchedule();
+            showToast("Admin dihapus dari daftar.", "info");
+        }
+
+        function updateMemberData(index, field, value) {
+            members[index][field] = value;
+        }
+
+        function saveAdminMembers(showSuccessToast = true) {
+            localStorage.setItem('shift_members', JSON.stringify(members));
+            if (showSuccessToast) {
+                showToast("Daftar Admin berhasil disimpan!", "success");
+            }
+            
+            if (googleWebAppUrl) {
+                syncToGoogleSheets();
+            }
+
+            renderDashboard();
+            renderCutiTab();
+            renderMonthlySchedule();
+        }
+
+        // --- GOOGLE SHEETS FETCH & SYNC ---
+        function fetchFromGoogleSheets(silent = false) {
+            if (!googleWebAppUrl) {
+                if (!silent) showToast("Masukkan URL Google Sheets terlebih dahulu di tombol Koneksi Google Sheets!", "warning");
+                return;
+            }
+
+            fetch(googleWebAppUrl)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.members) {
+                        members = data.members;
+                        localStorage.setItem('shift_members', JSON.stringify(members));
+                        if (!silent) showToast(`Berhasil menarik ${members.length} admin dari Google Sheets!`, "success");
+                        renderDashboard();
+                        renderCutiTab();
+                        renderMonthlySchedule();
+                        renderMembersTab();
+                    }
+                })
+                .catch(err => {
+                    if (!silent) showToast("Gagal mengambil data dari Google Sheets: " + err.message, "error");
+                });
+        }
+
+        function openSheetsModal() {
+            document.getElementById('sheetsModal').classList.remove('hidden');
+        }
+
+        function closeSheetsModal() {
+            document.getElementById('sheetsModal').classList.add('hidden');
+        }
+
+        function copyAppsScriptCode() {
+            const code = document.getElementById('appsScriptCodeBlock').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                showToast("Kode Apps Script berhasil disalin!", "success");
+            });
+        }
+
+        function saveSheetsConnection() {
+            const url = document.getElementById('sheetWebAppUrl').value.trim();
+            if (!url) {
+                googleWebAppUrl = "";
+                localStorage.removeItem('shift_sheet_url');
+                updateSyncStatus(false, "Lokal (Belum Sinkron)");
+                closeSheetsModal();
+                return;
+            }
+
+            googleWebAppUrl = url;
+            localStorage.setItem('shift_sheet_url', url);
+            updateSyncStatus(true, "Koneksi Google Sheets Aktif");
+            closeSheetsModal();
+
+            fetchFromGoogleSheets();
+        }
+
+        function updateSyncStatus(active, message) {
+            const badge = document.getElementById('syncStatusBadge');
+            const text = document.getElementById('syncStatusText');
+            
+            badge.classList.remove('hidden');
+            if (active) {
+                badge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            } else {
+                badge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30";
+            }
+            text.innerText = message;
+        }
+
+        function syncToGoogleSheets() {
+            if (!googleWebAppUrl) return;
+
+            fetch(googleWebAppUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "updateMembers",
+                    members: members
+                })
+            }).then(() => {
+                showToast("Tersinkronisasi dengan Google Sheets!", "success");
+            }).catch(err => {
+                showToast("Gagal terhubung ke Google Sheets: " + err.message, "error");
+            });
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-600', 'text-white', 'shadow-sm');
+                btn.classList.add('text-slate-600');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            activeBtn.classList.add('bg-brand-600', 'text-white', 'shadow-sm');
+            activeBtn.classList.remove('text-slate-600');
+        }
+
+        function showToast(msg, type = "info") {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            let bg = "bg-slate-900 text-white";
+            if (type === "success") bg = "bg-emerald-600 text-white";
+            if (type === "error") bg = "bg-rose-600 text-white";
+            if (type === "warning") bg = "bg-amber-600 text-white";
+
+            toast.className = `${bg} px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center space-x-2 transition-all transform translate-y-2`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${msg}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
